@@ -50,20 +50,46 @@ class CnvdSpider:
 
         return cookie
 
-    def vuln_spider(self):
+    def vuln_spider(self, offset):
         vuln_list_url = self.url + "flaw/list?flag=true"
+
+        form_data = {
+            "number": "请输入精确编号",
+            "startDate": "",
+            "endDate": "",
+            "field": "",
+            "order": "",
+            "numPerPage": 10,
+            "offset": offset,
+            "max": 10,
+        }
         time.sleep(random.randint(1, 4))
         self.cookie = self.get_cookies()
-        r = requests.get(url=vuln_list_url, cookies=self.cookie, headers=self.headers)
-        print(r.text)
+        r = requests.post(url=vuln_list_url, cookies=self.cookie, headers=self.headers, data=form_data)
+        # print(r.text)
+        return r.text
+
+    def page_parser(self, content):
+        pattern = r'<li><a href="(.*)" title="(.*)">'
+        matches = re.finditer(pattern, content, flags=re.MULTILINE)
+        for matchNum, match in enumerate(matches):
+            print("在{start}-{end}找到匹配{matchNum}: {match}".format(matchNum = matchNum, start = match.start(), end = match.end(), match = match.group()))
+            for groupNum in range(len(match.groups())):
+                groupNum += 1
+                print ("在{start}-{end}找到组{groupNum}: {group}".format(groupNum = groupNum, start = match.start(groupNum), end = match.end(groupNum), group = match.group(groupNum)))
         
+
+    def vuln_parser(self, content):
+        pass  
+
 
 def run():
     spider = CnvdSpider()
     cookie = spider.get_cookies()
     print(f"cookie:{cookie}")
 
-    spider.vuln_spider()
+    content = spider.vuln_spider(20)
+    spider.page_parser(content) 
 
 if __name__ == '__main__':
     run()
