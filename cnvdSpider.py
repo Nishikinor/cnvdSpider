@@ -5,6 +5,7 @@ from selenium.webdriver.chrome.options import Options
 import requests
 import time
 import random
+import json
 
 class CnvdSpider:
     def __init__(self):
@@ -16,6 +17,8 @@ class CnvdSpider:
             "Accept-Language": "en-US,en;q=0.9",
             "Connection": "keep-alive",
         }
+        self.cookie = ""
+        self.vuln_list = []
     
     def get_cookies(self):
         options = Options()
@@ -69,27 +72,34 @@ class CnvdSpider:
         # print(r.text)
         return r.text
 
-    def page_parser(self, content):
+    def page_vuln_parser(self, content):
         pattern = r'<li><a href="(.*)" title="(.*)">'
         matches = re.finditer(pattern, content, flags=re.MULTILINE)
-        for matchNum, match in enumerate(matches):
-            print("在{start}-{end}找到匹配{matchNum}: {match}".format(matchNum = matchNum, start = match.start(), end = match.end(), match = match.group()))
-            for groupNum in range(len(match.groups())):
-                groupNum += 1
-                print ("在{start}-{end}找到组{groupNum}: {group}".format(groupNum = groupNum, start = match.start(groupNum), end = match.end(groupNum), group = match.group(groupNum)))
-        
+        for match in matches:
+            cnvd_id = match.start(1)
+            self.vuln_list.append(cnvd_id)
 
-    def vuln_parser(self, content):
-        pass  
+    def vuln_details_parser(self, cnvd_id):
+        vuln_url = self.url + "flaw/show/" + cnvd_id
+        details = {}
+        vuln_res = requests.get(vuln_url, cookies=self.cookie, headers=self.headers)
+        content = vuln_res.text
+        pattern = r'\"alignRight\">(.*)<\/td>\n.+<td>([\s\S]+?)</td>'
+
+        matches = re.finditer(pattern, content, re.MULTILINE)
+        for match in matches:
+            details[match.group(1)] = match.group(2).strip().replace('</br>', '') # log file
+        
+        return details
+
+    def write_vuln_to_json(self, vuln):
+        pass
 
 
 def run():
     spider = CnvdSpider()
-    cookie = spider.get_cookies()
-    print(f"cookie:{cookie}")
-
     content = spider.vuln_spider(20)
-    spider.page_parser(content) 
+    spider.page_vuln_parser(content) 
 
 if __name__ == '__main__':
     run()
