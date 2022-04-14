@@ -18,7 +18,7 @@ class CnvdSpider:
             "Connection": "keep-alive",
         }
         self.cookie = ""
-        self.vuln_list = []
+        self.vuln_list = {} # format: {"cnvdid": {"attr": "description"}}
     
     def get_cookies(self):
         options = Options()
@@ -69,7 +69,6 @@ class CnvdSpider:
         time.sleep(random.randint(1, 4))
         self.cookie = self.get_cookies()
         r = requests.post(url=vuln_list_url, cookies=self.cookie, headers=self.headers, data=form_data)
-        # print(r.text)
         return r.text
 
     def page_vuln_parser(self, content):
@@ -77,7 +76,7 @@ class CnvdSpider:
         matches = re.finditer(pattern, content, flags=re.MULTILINE)
         for match in matches:
             cnvd_id = match.start(1)
-            self.vuln_list.append(cnvd_id)
+            self.vuln_dict[cnvd_id] = {}
 
     def vuln_details_parser(self, cnvd_id):
         vuln_url = self.url + "flaw/show/" + cnvd_id
@@ -89,12 +88,15 @@ class CnvdSpider:
         matches = re.finditer(pattern, content, re.MULTILINE)
         for match in matches:
             details[match.group(1)] = match.group(2).strip().replace('</br>', '') # log file
+
+        self.vuln_list[cnvdid] = details
         
         return details
 
-    def write_vuln_to_json(self, vuln):
-        pass
-
+    def write_vuln_to_json(self, filename):
+        j = json.dumps(self.vuln_dict)
+        with open(filename, "w") as f:
+            f.write(j)
 
 def run():
     spider = CnvdSpider()
