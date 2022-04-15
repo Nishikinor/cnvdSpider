@@ -67,7 +67,7 @@ class CnvdSpider:
             "offset": offset,
             "max": 10,
         }
-        time.sleep(random.randint(1, 4))
+        time.sleep(random.uniform(1.0, 3.0))
         self.cookie = self.get_cookies()
         r = requests.post(url=vuln_list_url, cookies=self.cookie, headers=self.headers, data=form_data)
         return r.text
@@ -90,7 +90,7 @@ class CnvdSpider:
         matches = re.finditer(pattern, content, re.MULTILINE | re.UNICODE)
         
         # Clean up the whitespace and escape chars
-        clean_string = lambda s: s.replace('\r', '').replace('\t', '').replace('<br/>', ' ')
+        clean_string = lambda s: s.replace('\r', '').replace('\t', '').replace('<br/>', ' ').replace('\n\n', '\n')
         
         for match in matches:
             description = clean_string(match.group(2).strip()) if match.group(2) else match.group(3) # 描述匹配
@@ -109,15 +109,18 @@ class CnvdSpider:
             self._vuln_details_parser(cnvd_id)
 
     def write_vuln_to_json(self, filename):
-        j = json.dumps(self.vuln_dict)
-        with open(filename, "w") as f:
+        j = json.dumps(self.vuln_dict, ensure_ascii=False, indent=4)
+        with open(filename, "w", encoding="utf-8") as f:
             f.write(j)
 
 def run():
+
     spider = CnvdSpider()
-    content = spider.vuln_spider(20)
-    spider.page_vuln_parser(content) 
-    spider.update_vuln_details()
+    for i in range(0, 100, 10):
+        content = spider.vuln_spider(i)
+        spider.page_vuln_parser(content) 
+        spider.update_vuln_details()
+        
     spider.write_vuln_to_json(filename="vuln.json")
 
 if __name__ == '__main__':
