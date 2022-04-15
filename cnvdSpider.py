@@ -1,3 +1,4 @@
+# -*-coding:utf-8-*- 
 import re
 import ast
 from selenium import webdriver
@@ -18,7 +19,7 @@ class CnvdSpider:
             "Connection": "keep-alive",
         }
         self.cookie = ""
-        self.vuln_list = {} # format: {"cnvdid": {"attr": "description"}}
+        self.vuln_dict = {} # format: {"cnvdid": {"attr": "description"}}
     
     def get_cookies(self):
         options = Options()
@@ -75,23 +76,37 @@ class CnvdSpider:
         pattern = r'<li><a href="(.*)" title="(.*)">'
         matches = re.finditer(pattern, content, flags=re.MULTILINE)
         for match in matches:
-            cnvd_id = match.start(1)
+            cnvd_id = match.group(1).lstrip("/flaw/show")
             self.vuln_dict[cnvd_id] = {}
 
-    def vuln_details_parser(self, cnvd_id):
+    def _vuln_details_parser(self, cnvd_id):
         vuln_url = self.url + "flaw/show/" + cnvd_id
         details = {}
         vuln_res = requests.get(vuln_url, cookies=self.cookie, headers=self.headers)
         content = vuln_res.text
-        pattern = r'\"alignRight\">(.*)<\/td>\n.+<td>([\s\S]+?)</td>'
 
-        matches = re.finditer(pattern, content, re.MULTILINE)
+        pattern = r"<td class=\"alignRight\">(.*?)</td>[\n\s]*?(?:(?:<td>([\n\s\w\uff0c\uff1a\u3002\D]*?)</td>)|(?:<td class=.*>[\s\S]*?([\u4e00-\u9fa5]+)[\s\S]*?</td>))"
+
+        matches = re.finditer(pattern, content, re.MULTILINE | re.UNICODE)
+        
+        # Clean up the whitespace and escape chars
+        clean_string = lambda s: s.replace('\r', '').replace('\t', '').replace('<br/>', ' ')
+        
         for match in matches:
-            details[match.group(1)] = match.group(2).strip().replace('</br>', '') # log file
+            description = clean_string(match.group(2).strip()) if match.group(2) else match.group(3) # 描述匹配
+                
+            details[match.group(1)] = description # log file
 
-        self.vuln_list[cnvdid] = details
+        self.vuln_dict[cnvd_id] = details
         
         return details
+
+    def update_vuln_details(self):
+        ''' Update vuln details in vuln_dict structure
+        '''
+        for cnvd_id in self.vuln_dict.keys():
+            time.sleep(random.uniform(1.0, 3.0))
+            self._vuln_details_parser(cnvd_id)
 
     def write_vuln_to_json(self, filename):
         j = json.dumps(self.vuln_dict)
@@ -102,6 +117,8 @@ def run():
     spider = CnvdSpider()
     content = spider.vuln_spider(20)
     spider.page_vuln_parser(content) 
+    spider.update_vuln_details()
+    spider.write_vuln_to_json(filename="vuln.json")
 
 if __name__ == '__main__':
     run()
