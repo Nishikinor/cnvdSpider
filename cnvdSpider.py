@@ -52,6 +52,8 @@ class CnvdSpider:
         cookie = ast.literal_eval('{'+cookie+'}')
         cookie['__jsl_clearance_s']=ccc.split("=")[1]
 
+        self.cookie = cookie
+
         return cookie
 
     def vuln_spider(self, offset):
@@ -68,7 +70,6 @@ class CnvdSpider:
             "max": 10,
         }
         time.sleep(random.uniform(1.0, 3.0))
-        self.cookie = self.get_cookies()
         r = requests.post(url=vuln_list_url, cookies=self.cookie, headers=self.headers, data=form_data)
         return r.text
 
@@ -80,6 +81,8 @@ class CnvdSpider:
             self.vuln_dict[cnvd_id] = {}
 
     def _vuln_details_parser(self, cnvd_id):
+        """Parse the vulnerablity details which presented on the current page.
+        """
         vuln_url = self.url + "flaw/show/" + cnvd_id
         details = {}
         vuln_res = requests.get(vuln_url, cookies=self.cookie, headers=self.headers)
@@ -102,8 +105,8 @@ class CnvdSpider:
         return details
 
     def update_vuln_details(self):
-        ''' Update vuln details in vuln_dict structure
-        '''
+        """ Update vuln details in vuln_dict structure
+        """
         for cnvd_id in self.vuln_dict.keys():
             time.sleep(random.uniform(1.0, 3.0))
             self._vuln_details_parser(cnvd_id)
@@ -116,6 +119,7 @@ class CnvdSpider:
 def run():
 
     spider = CnvdSpider()
+    spider.get_cookies()
     for i in range(0, 100, 10):
         content = spider.vuln_spider(i)
         spider.page_vuln_parser(content) 
