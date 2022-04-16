@@ -7,7 +7,37 @@ import requests
 import time
 import random
 import json
+from http.client import HTTPConnection
+import logging
+import contextlib
 
+def debug_requests_on():
+    """Switches on logging of the requests module.
+    """
+    HTTPConnection.debuglevel = 1
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.DEBUG)
+    requests_log = logging.getLogger('requests.packages.urllib3')
+    requests_log.setLevel(logging.DEBUG)
+    requests_log.propagate = True
+
+def debug_requests_off():
+    """Switches off logging of the requests module, might be some side-effects
+    """
+    HTTPConnection.debuglevel = 0
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.Warning)
+    root_logger.handlers = []
+    requests_log = logging.getLogger("requests.packages.urllib3")
+    requests_log.setLevel(logging.WARNING)
+    requests_log.propagate = False
+    
+@contextlib.contextmanager
+def debug_requests():
+    debug_requests_on()
+    yield
+    debug_requests_off()
+    
 class CnvdSpider:
     def __init__(self):
         self.url = "https://www.cnvd.org.cn/"
@@ -20,6 +50,8 @@ class CnvdSpider:
         }
         self.cookie = ""
         self.vuln_dict = {} # format: {"cnvdid": {"attr": "description"}}
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
     
     def get_cookies(self):
         options = Options()
@@ -52,7 +84,7 @@ class CnvdSpider:
         cookie = ast.literal_eval('{'+cookie+'}')
         cookie['__jsl_clearance_s']=ccc.split("=")[1]
 
-        self.cookie = cookie
+        self.session.cookies.update(cookie)
 
         return cookie
 
@@ -69,8 +101,13 @@ class CnvdSpider:
             "offset": offset,
             "max": 10,
         }
-        time.sleep(random.uniform(1.0, 3.0))
-        r = requests.post(url=vuln_list_url, cookies=self.cookie, headers=self.headers, data=form_data)
+        
+        time.sleep(random.uniform(2.0, 6.0))
+        if offset == 0:
+            r = self.session.get(url=self.url+"flaw/list")
+        else:   
+            r = self.session.post(url=vuln_list_url, data=form_data)
+            
         return r.text
 
     def page_vuln_parser(self, content):
@@ -85,7 +122,7 @@ class CnvdSpider:
         """
         vuln_url = self.url + "flaw/show/" + cnvd_id
         details = {}
-        vuln_res = requests.get(vuln_url, cookies=self.cookie, headers=self.headers)
+        vuln_res = self.session.get(vuln_url)
         content = vuln_res.text
 
         pattern = r"<td class=\"alignRight\">(.*?)</td>[\n\s]*?(?:(?:<td>([\n\s\w\uff0c\uff1a\u3002\D]*?)</td>)|(?:<td class=.*>[\s\S]*?([\u4e00-\u9fa5]+)[\s\S]*?</td>))"
@@ -93,39 +130,45 @@ class CnvdSpider:
         matches = re.finditer(pattern, content, re.MULTILINE | re.UNICODE)
         
         # Clean up the whitespace and escape chars
-        clean_string = lambda s: s.replace('\r', '').replace('\t', '').replace('<br/>', ' ').replace('\n\n', '\n')
+        handle_string = lambda s: s.replace('\r', '').replace('\t', '').replace('<br/>', ' ').replace('\n\n', '\n')
         
         for match in matches:
-            description = clean_string(match.group(2).strip()) if match.group(2) else match.group(3) # 描述匹配
+            description = handle_string(match.group(2).strip()) if match.group(2) else match.group(3) # 描述匹配
                 
             details[match.group(1)] = description # log file
 
-        self.vuln_dict[cnvd_id] = details
+        self.vuln_dict.update({cnvd_id: details})
         
         return details
 
     def update_vuln_details(self):
         """ Update vuln details in vuln_dict structure
         """
-        for cnvd_id in self.vuln_dict.keys():
-            time.sleep(random.uniform(1.0, 3.0))
-            self._vuln_details_parser(cnvd_id)
+        # TODO: fix update logic
+        for cnvd_id, details in self.vuln_dict.items():
+            if not details:
+                time.sleep(random.uniform(1.0, 5.0))
+                self._vuln_details_parser(cnvd_id)
 
     def write_vuln_to_json(self, filename):
         j = json.dumps(self.vuln_dict, ensure_ascii=False, indent=4)
         with open(filename, "w", encoding="utf-8") as f:
             f.write(j)
 
-def run():
-
+def vuln_list_spider():
     spider = CnvdSpider()
     spider.get_cookies()
-    for i in range(0, 100, 10):
-        content = spider.vuln_spider(i)
+
+    debug_requests_on()
+    for offset in range(0, 100, 10):
+        content = spider.vuln_spider(offset)
         spider.page_vuln_parser(content) 
-        spider.update_vuln_details()
-        
+
+    spider.update_vuln_details()
     spider.write_vuln_to_json(filename="vuln.json")
+
+def run():
+    vuln_list_spider()
 
 if __name__ == '__main__':
     run()
