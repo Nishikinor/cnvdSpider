@@ -61,7 +61,7 @@ class CnvdSpider:
         options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36')
         options.add_argument('--disable-gpu')
         driver = webdriver.Chrome(options=options)
-        driver.get(self.url)
+        driver.get(self.url + "flaw/list.htm")
 
         page_source = driver.page_source
         page_source = page_source.split("<script>")[1]
@@ -111,10 +111,10 @@ class CnvdSpider:
         return r.text
 
     def page_vuln_parser(self, content):
-        pattern = r'<li><a href="(.*)" title="(.*)">'
+        pattern = r'<a[\s\n]+?href=\"/flaw/show/(.*)\"[\s\n]+title=\"(.*)\"'
         matches = re.finditer(pattern, content, flags=re.MULTILINE)
         for match in matches:
-            cnvd_id = match.group(1).lstrip("/flaw/show")
+            cnvd_id = match.group(1)
             self.vuln_dict[cnvd_id] = {}
 
     def _vuln_details_parser(self, cnvd_id):
