@@ -124,6 +124,7 @@ class CnvdSpider:
         details = {}
         vuln_res = self.session.get(vuln_url)
         content = vuln_res.text
+        status_code = vuln_res.status_code
 
         pattern = r"<td class=\"alignRight\">(.*?)</td>[\n\s]*?(?:(?:<td>([\n\s\w\uff0c\uff1a\u3002\D]*?)</td>)|(?:<td class=.*>[\s\S]*?([\u4e00-\u9fa5]+)[\s\S]*?</td>))"
 
@@ -139,16 +140,21 @@ class CnvdSpider:
 
         self.vuln_dict.update({cnvd_id: details})
         
-        return details
+        return status_code
 
     def update_vuln_details(self):
         """ Update vuln details in vuln_dict structure
         """
-        # TODO: fix update logic
+        start_time = time.time()
         for cnvd_id, details in self.vuln_dict.items():
             if not details:
-                time.sleep(random.uniform(1.0, 5.0))
-                self._vuln_details_parser(cnvd_id)
+                time.sleep(random.uniform(3.0, 10.0))
+                status_code = self._vuln_details_parser(cnvd_id)
+                if status_code != 200:
+                    break
+                end_time = time.time()
+                if end_time - start_time > 3500:
+                    self.get_cookies()
 
     def write_vuln_to_json(self, filename):
         j = json.dumps(self.vuln_dict, ensure_ascii=False, indent=4)
@@ -165,6 +171,7 @@ def vuln_list_spider():
         spider.page_vuln_parser(content) 
 
     spider.update_vuln_details()
+
     spider.write_vuln_to_json(filename="vuln.json")
 
 def run():
