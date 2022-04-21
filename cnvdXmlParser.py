@@ -51,12 +51,13 @@ def xml_parser(xml_file, session):
             print(patch_method)
             print()
 
-def get_cvss(cveNumber):
-    pass
+def get_cvss(cveNumber: str):
+    cvss2_pattern = r"\"Cvss2CalculatorAnchor\"[\s\n]+.*\"label label-warning\">(\d.\d)[\n\s]+(.*?)<\/a>"
     
-
+    
 def main():
     with requests.Session() as ss:
+        login(ss)
         for xml_file in get_xml_files("vulns/xml"):
             xml_parser(xml_file, ss)
 
