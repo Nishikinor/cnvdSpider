@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET 
 import pathlib
 import requests
+import re
 from config import (
     username, password, login_url, code
 )
@@ -51,9 +52,17 @@ def xml_parser(xml_file, session):
             print(patch_method)
             print()
 
-def get_cvss(cveNumber: str):
-    cvss2_pattern = r"\"Cvss2CalculatorAnchor\"[\s\n]+.*\"label label-warning\">(\d.\d)[\n\s]+(.*?)<\/a>"
-    
+def get_cvss(cve_number: str):
+    nvd_url = "https://nvd.nist.gov/vuln/detail/" + cve_number
+    text = requests.get(nvd_url)
+    cvss2_pattern = re.compile(r'\"Cvss2CalculatorAnchor\"[\s\n]+.*?\label.*?>(\d.\d) (\w+)', re.MULTILINE)
+
+    matches = re.finditer(cvss2_pattern, text)
+    for match in matches:
+        cvss_number = match.group(1)
+        cvss_level = match.group(2)
+            
+    return cvss_number, cvss_level
     
 def main():
     with requests.Session() as ss:

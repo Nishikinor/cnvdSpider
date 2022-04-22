@@ -15,7 +15,7 @@ def get_content_length(form_data: dict):
 def login(session: requests.Session):
 
     login_form = {
-        "username": username,
+        "name": username,
         "password": password,
         "code": str(code),
     }
@@ -23,6 +23,7 @@ def login(session: requests.Session):
     header = {
         "Host": "threat.fire369.com",
         "Content-Length": get_content_length(login_form),
+        # "Content-Length": "47",
         "Accept": "application/json, text/plain, */*",
         "ts": str(int(time.time()*1000)),
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.88 Safari/537.36",
@@ -37,9 +38,13 @@ def login(session: requests.Session):
 
     r = session.post(url=login_url, data=login_form, headers=header)
     print(r.text)
+
+def run():
+    ss = requests.Session()
+    
+    login(ss)
+    
+    ss.close()
     
 if __name__ == "__main__":
-    ss = requests.Session()
-
-    login(ss)
-    ss.close()
+    run()
