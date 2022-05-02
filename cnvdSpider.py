@@ -10,6 +10,7 @@ import json
 from http.client import HTTPConnection
 import logging
 import contextlib
+import pathlib
 
 def debug_requests_on():
     """Switches on logging of the requests module.
@@ -114,8 +115,13 @@ class CnvdSpider:
         pattern = r'<a[\s\n]+?href=\"/flaw/show/(.*)\"[\s\n]+title=\"(.*)\"'
         matches = re.finditer(pattern, content, flags=re.MULTILINE)
         for match in matches:
+            time.sleep(random.randint(3, 10))
             cnvd_id = match.group(1)
-            self.vuln_dict[cnvd_id] = {}
+            status_code, details = self._vuln_details_parser(cnvd_id)
+            if status_code != 200:
+                break
+            self.write_vuln_to_json(filename=cnvd_id, vuln_details=details)
+            
 
     def _vuln_details_parser(self, cnvd_id):
         """Parse the vulnerablity details which presented on the current page.
@@ -138,27 +144,16 @@ class CnvdSpider:
                 
             details[match.group(1)] = description # log file
 
-        self.vuln_dict.update({cnvd_id: details})
         
-        return status_code
+        return status_code, details
 
-    def update_vuln_details(self):
-        """ Update vuln details in vuln_dict structure
-        """
-        start_time = time.time()
-        for cnvd_id, details in self.vuln_dict.items():
-            if not details:
-                time.sleep(random.uniform(3.0, 10.0))
-                status_code = self._vuln_details_parser(cnvd_id)
-                if status_code != 200:
-                    break
-                end_time = time.time()
-                if end_time - start_time > 3500:
-                    self.get_cookies()
 
-    def write_vuln_to_json(self, filename):
-        j = json.dumps(self.vuln_dict, ensure_ascii=False, indent=4)
-        with open(filename, "w", encoding="utf-8") as f:
+    def write_vuln_to_json(self, filename, vuln_details):
+        filename += ".json"
+        json_path = pathlib.Path("vulns/json")
+        json_path.mkdir(exist_ok=True)
+        j = json.dumps(vuln_details, ensure_ascii=False, indent=4)
+        with open(json_path / filename, "w", encoding="utf-8") as f:
             f.write(j)
 
 def vuln_list_spider():
@@ -166,7 +161,7 @@ def vuln_list_spider():
     spider.get_cookies()
 
     debug_requests_on()
-    for offset in range(0, 100, 10):
+    for offset in range(0, 10000, 10):
         content = spider.vuln_spider(offset)
         spider.page_vuln_parser(content) 
 
