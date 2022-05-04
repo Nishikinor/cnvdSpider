@@ -5,6 +5,7 @@ import re
 from config import (
     username, password, login_url, code
 )
+import json
 
 def get_xml_files(dirname):
     xml_folder = pathlib.Path(dirname) 
@@ -27,31 +28,33 @@ def login(session):
 
     r = session.post(login_url, data=login_form)
 
-def xml_parser(xml_file, session):
+def write_vuln_to_json(details: dict):
+    j = json.dumps(details, ensure_ascii=False, indent=4) 
+    json_path = pathlib.Path("vulns/xml2json")
+    json_path.mkdir(parents=True, exist_ok=True)
+    filename = details['cnvdnumber'] + ".json"
+    with open(json_path / filename, mode="w", encoding="utf-8") as f:
+        f.write(j)
+
+
+
+def xml_parser(xml_file):
+    details = {}
     with open(xml_file, 'r', encoding='utf-8') as f:
         tree = ET.parse(f)
         for item in tree.iterfind("vulnerability"):
-            cnvdnumber = findattr_wrap(item, "number")
-            cvenumber = findattr_wrap(item, 'cves/cve/cveNumber')
-            title = findattr_wrap(item, "title")
-            serverity = findattr_wrap(item, 'serverity')
-            products = findattr_wrap(item, 'products/product')
-            vuln_type = findattr_wrap(item, 'isEvent')
-            open_time = findattr_wrap(item, 'openTime')
-            referencelink = findattr_wrap(item, 'referenceLink')
-            patch_method = findattr_wrap(item, 'formalWay')
-            
-            print(cnvdnumber)
-            print(cvenumber)
-            print(title)
-            print(serverity)
-            print(products)
-            print(vuln_type)
-            print(open_time)
-            print(referencelink)
-            print(patch_method)
-            print()
+            details['cnvdnumber'] = findattr_wrap(item, "number")
+            details['cvenumber'] = findattr_wrap(item, 'cves/cve/cveNumber')
+            details['title'] = findattr_wrap(item, "title")
+            details['serverity'] = findattr_wrap(item, 'serverity')
+            details['products'] = findattr_wrap(item, 'products/product')
+            details['vuln_type'] = findattr_wrap(item, 'isEvent')
+            details['open_time'] = findattr_wrap(item, 'openTime')
+            details['referencelink'] = findattr_wrap(item, 'referenceLink')
+            details['patch_method'] = findattr_wrap(item, 'formalWay')
+            write_vuln_to_json(details)
 
+            
 def get_cvss(cve_number: str):
     nvd_url = "https://nvd.nist.gov/vuln/detail/" + cve_number
     text = requests.get(nvd_url)
@@ -66,9 +69,9 @@ def get_cvss(cve_number: str):
     
 def main():
     with requests.Session() as ss:
-        login(ss)
+        # login(ss)
         for xml_file in get_xml_files("vulns/xml"):
-            xml_parser(xml_file, ss)
+            xml_parser(xml_file)
 
 if __name__ == "__main__":
     main()

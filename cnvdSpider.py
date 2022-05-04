@@ -115,11 +115,15 @@ class CnvdSpider:
         pattern = r'<a[\s\n]+?href=\"/flaw/show/(.*)\"[\s\n]+title=\"(.*)\"'
         matches = re.finditer(pattern, content, flags=re.MULTILINE)
         for match in matches:
-            time.sleep(random.randint(3, 10))
+            time.sleep(random.uniform(4.0, 10.0))
             cnvd_id = match.group(1)
+            cnvd_id_file = pathlib.Path("vuln/json") / (cnvd_id + ".json")
+            if cnvd_id_file.exists():
+               continue 
             status_code, details = self._vuln_details_parser(cnvd_id)
             if status_code != 200:
-                break
+                time.sleep(200)
+                continue
             self.write_vuln_to_json(filename=cnvd_id, vuln_details=details)
             
 
@@ -151,7 +155,7 @@ class CnvdSpider:
     def write_vuln_to_json(self, filename, vuln_details):
         filename += ".json"
         json_path = pathlib.Path("vulns/json")
-        json_path.mkdir(exist_ok=True)
+        json_path.mkdir(parents=True ,exist_ok=True)
         j = json.dumps(vuln_details, ensure_ascii=False, indent=4)
         with open(json_path / filename, "w", encoding="utf-8") as f:
             f.write(j)
@@ -161,13 +165,22 @@ def vuln_list_spider():
     spider.get_cookies()
 
     debug_requests_on()
-    for offset in range(0, 10000, 10):
+    start_time = time.time()
+    for offset in range(500, 10000, 10):
         content = spider.vuln_spider(offset)
-        spider.page_vuln_parser(content) 
+        spider.page_vuln_parser(content)
+        end_time = time.time()
+        if end_time - start_time > 3500:
+            time.sleep(300)
+            try:
+                spider.get_cookies()
+            except Exception as e:
+                continue
 
-    spider.update_vuln_details()
 
-    spider.write_vuln_to_json(filename="vuln.json")
+
+
+    # spider.write_vuln_to_json(filename="vuln.json")
 
 def run():
     vuln_list_spider()
